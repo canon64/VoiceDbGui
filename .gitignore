@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+kks_voices_gui_state.json
+*.db
+CODEBASE_STATE.md
