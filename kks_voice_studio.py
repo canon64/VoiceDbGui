@@ -430,8 +430,13 @@ class BuildDbTab(tk.Frame):
 
     def _worker(self, wav_dir: str, db_path: str):
         try:
-
-            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+            # DB出力先がディレクトリならファイル名を補完
+            p = Path(db_path)
+            if p.is_dir() or not p.suffix:
+                p = p / "kks_voices.db"
+                db_path = str(p)
+            self._log_queue.put(f"[DB] 出力先: {db_path}\n")
+            p.parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(db_path)
             conn.executescript(DB_DDL)
             conn.execute("DELETE FROM voices")
