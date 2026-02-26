@@ -320,10 +320,12 @@ CREATE INDEX IF NOT EXISTS idx_voices_file_type ON voices(file_type);
 """
 
 class BuildDbTab(tk.Frame):
-    def __init__(self, parent):
+    def __init__(self, parent, on_build_done=None):
         super().__init__(parent)
-        self._log_queue = queue.Queue()
-        self._running   = False
+        self._log_queue   = queue.Queue()
+        self._running     = False
+        self._on_done     = on_build_done  # callback(db_path: str)
+        self._last_db     = None
         self._build_ui()
 
     def _build_ui(self):
@@ -404,6 +406,8 @@ class BuildDbTab(tk.Frame):
                     self._running = False
                     self._build_btn.config(state=tk.NORMAL)
                     self._status_var.set("完了")
+                    if self._on_done and self._last_db:
+                        self._on_done(self._last_db)
                     return
                 self._append_log(item)
         except queue.Empty:
@@ -435,6 +439,7 @@ class BuildDbTab(tk.Frame):
             if p.is_dir() or not p.suffix:
                 p = p / "kks_voices.db"
                 db_path = str(p)
+            self._last_db = db_path
             self._log_queue.put(f"[DB] 出力先: {db_path}\n")
             p.parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(db_path)
@@ -1031,14 +1036,18 @@ class KksVoiceStudio(tk.Tk):
         nb.pack(fill="both", expand=True)
 
         self._tab_extract = ExtractTab(nb)
-        self._tab_build   = BuildDbTab(nb)
         self._tab_browse  = BrowseTab(nb)
+        self._tab_build   = BuildDbTab(nb, on_build_done=self._on_build_done)
 
         nb.add(self._tab_extract, text="  抽出  ")
         nb.add(self._tab_build,   text="  DB構築  ")
         nb.add(self._tab_browse,  text="  ブラウズ  ")
 
         self._load_settings()
+
+    def _on_build_done(self, db_path: str):
+        self._tab_browse._db_var.set(db_path)
+        self._tab_browse._connect()
 
     def _load_settings(self):
         if not APP_STATE_PATH.exists():
