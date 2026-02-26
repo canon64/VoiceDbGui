@@ -179,6 +179,24 @@ class ExtractTab(tk.Frame):
         for v in self._char_vars.values():
             v.set(False)
 
+    def get_settings(self):
+        return {
+            "kks_dir": self._kks_var.get(),
+            "out_dir": self._out_var.get(),
+            "chars": {k: v.get() for k, v in self._char_vars.items()},
+        }
+
+    def apply_settings(self, d):
+        if not d:
+            return
+        if d.get("kks_dir"):
+            self._kks_var.set(d["kks_dir"])
+        if d.get("out_dir"):
+            self._out_var.set(d["out_dir"])
+        for k, v in d.get("chars", {}).items():
+            if k in self._char_vars:
+                self._char_vars[k].set(bool(v))
+
     def _append_log(self, text: str):
         self._log.config(state=tk.NORMAL)
         self._log.insert("end", text)
@@ -371,6 +389,23 @@ class BuildDbTab(tk.Frame):
             filetypes=[("SQLite DB", "*.db"), ("All", "*.*")])
         if p:
             self._db_var.set(p)
+
+    def get_settings(self):
+        return {
+            "wav_dir": self._wav_var.get(),
+            "csv_dir": self._csv_var.get(),
+            "db_path": self._db_var.get(),
+        }
+
+    def apply_settings(self, d):
+        if not d:
+            return
+        if d.get("wav_dir"):
+            self._wav_var.set(d["wav_dir"])
+        if d.get("csv_dir") is not None:
+            self._csv_var.set(d["csv_dir"])
+        if d.get("db_path"):
+            self._db_var.set(d["db_path"])
 
     def _append_log(self, text: str):
         self._log.config(state=tk.NORMAL)
@@ -926,8 +961,17 @@ class BrowseTab(tk.Frame):
 
     def _write_state(self):
         try:
+            # 既存ファイルのキー（extract/build など）を保持して上書き
+            existing = {}
+            if APP_STATE_PATH.exists():
+                try:
+                    existing = json.loads(APP_STATE_PATH.read_text("utf-8"))
+                except Exception:
+                    pass
+            existing["last"]    = self.app_state.get("last")
+            existing["history"] = self.app_state.get("history", [])
             tmp = APP_STATE_PATH.with_suffix(".tmp")
-            tmp.write_text(json.dumps(self.app_state, ensure_ascii=False, indent=2),
+            tmp.write_text(json.dumps(existing, ensure_ascii=False, indent=2),
                            encoding="utf-8")
             tmp.replace(APP_STATE_PATH)
         except Exception:
@@ -1023,7 +1067,37 @@ class KksVoiceStudio(tk.Tk):
         nb.add(self._tab_build,   text="  DB構築  ")
         nb.add(self._tab_browse,  text="  ブラウズ  ")
 
+        self._load_settings()
+
+    def _load_settings(self):
+        if not APP_STATE_PATH.exists():
+            return
+        try:
+            state = json.loads(APP_STATE_PATH.read_text("utf-8"))
+            self._tab_extract.apply_settings(state.get("extract"))
+            self._tab_build.apply_settings(state.get("build"))
+        except Exception:
+            pass
+
+    def _save_settings(self):
+        try:
+            existing = {}
+            if APP_STATE_PATH.exists():
+                try:
+                    existing = json.loads(APP_STATE_PATH.read_text("utf-8"))
+                except Exception:
+                    pass
+            existing["extract"] = self._tab_extract.get_settings()
+            existing["build"]   = self._tab_build.get_settings()
+            tmp = APP_STATE_PATH.with_suffix(".tmp")
+            tmp.write_text(json.dumps(existing, ensure_ascii=False, indent=2),
+                           encoding="utf-8")
+            tmp.replace(APP_STATE_PATH)
+        except Exception:
+            pass
+
     def destroy(self):
+        self._save_settings()
         try:
             if self._tab_browse.conn:
                 self._tab_browse.conn.close()
