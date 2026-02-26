@@ -637,6 +637,9 @@ class BrowseTab(tk.Frame):
         # Export buttons
         exp_fr = tk.Frame(self)
         exp_fr.pack(fill="x", padx=6, pady=3)
+        tk.Button(exp_fr, text="全選択",
+                  command=self._select_all_rows,
+                  width=8).pack(side="left", padx=2)
         tk.Button(exp_fr, text="表示中を保存",
                   command=lambda: self._export(all_displayed=True),
                   width=16).pack(side="left", padx=2)
@@ -802,6 +805,9 @@ class BrowseTab(tk.Frame):
         self._detail.insert("end", text)
         self._detail.config(state=tk.DISABLED)
 
+    def _select_all_rows(self):
+        self._tree.selection_set(self._tree.get_children())
+
     def _prev_page(self):
         p = self._page_var.get()
         if p > 1:
@@ -866,6 +872,12 @@ class BrowseTab(tk.Frame):
             mw.writerow(["table","id","chara","mode_name","level_name",
                           "filename","source_wav_path","exported_path"])
             for row in rows:
+                serif = row.get("serif","") or ""
+                fn    = row.get("filename","")
+                chara = row.get("chara","")
+                # voice_text CSV は常に書く
+                vw.writerow([fn, chara, "JP", serif])
+
                 src = row.get("wav_path","")
                 if not src or not Path(src).is_file():
                     missing += 1
@@ -881,12 +893,9 @@ class BrowseTab(tk.Frame):
                     shutil.copy2(src, dest)
                     copied += 1
                     mw.writerow([tbl, row.get("id",""),
-                                  row.get("chara",""), row.get("mode_name",""),
-                                  row.get("level_name",""), row.get("filename",""),
+                                  chara, row.get("mode_name",""),
+                                  row.get("level_name",""), fn,
                                   src, str(dest)])
-                    serif = row.get("serif","") or ""
-                    vw.writerow([row.get("filename",""),
-                                  row.get("chara",""), "JP", serif])
                 except Exception:
                     failed += 1
 
