@@ -75,24 +75,34 @@ def sanitize(value: str, max_len: int = 120) -> str:
         value = value.replace(c, "_")
     return value.strip()[:max_len] or "_"
 
+_INSERT_TYPES  = {"so", "so3p"}
+_HOUSHI_TYPES  = {"hh", "hh3p"}
+_AIBU_TYPES    = {"ka", "ka3p", "ai"}
+_SITUA_TYPES   = {"fe", "ko", "on"}
+
 def parse_voice_filename(filename: str):
     m = FILENAME_RE.match(filename)
     if not m:
         return None
     type_code, char_num, level_code, seq = m.groups()
-    info = TYPE_INFO.get(type_code.lower())
+    tc = type_code.lower()
+    info = TYPE_INFO.get(tc)
     if not info:
         return None
     cn = int(char_num)
     chara = f"c{cn:02d}" if cn >= 0 else f"c{cn}"
     return {
-        "chara":      chara,
-        "mode_name":  info[1],
-        "voice_id":   int(seq),
-        "level":      int(level_code),
-        "level_name": LEVEL_NAME.get(level_code, f"level_{level_code}"),
-        "filename":   filename,
-        "file_type":  type_code.lower(),
+        "chara":          chara,
+        "mode_name":      info[1],
+        "voice_id":       int(seq),
+        "level":          int(level_code),
+        "level_name":     LEVEL_NAME.get(level_code, f"level_{level_code}"),
+        "filename":       filename,
+        "file_type":      tc,
+        "insert_type":    tc if tc in _INSERT_TYPES  else "",
+        "houshi_type":    tc if tc in _HOUSHI_TYPES  else "",
+        "aibu_type":      tc if tc in _AIBU_TYPES    else "",
+        "situation_type": tc if tc in _SITUA_TYPES   else "",
     }
 
 # ── Extract Tab ───────────────────────────────────────────────────────────────
@@ -474,7 +484,8 @@ class BuildDbTab(tk.Frame):
                         parsed["level_name"],
                         fn,
                         parsed["file_type"],
-                        "", "", "", "",     # insert_type, houshi_type, aibu_type, situation_type
+                        parsed["insert_type"], parsed["houshi_type"],
+                        parsed["aibu_type"],   parsed["situation_type"],
                         str(wav_path),
                         "",  # serif は後からブラウズタブのエクスポートCSVで設定
                     ))
