@@ -337,23 +337,14 @@ class BuildDbTab(tk.Frame):
         tk.Entry(fr, textvariable=self._wav_var).pack(side="left", fill="x", expand=True)
         tk.Button(fr, text="参照", command=self._browse_wav).pack(side="left", padx=2)
 
-        # Serif CSV dir (optional)
+        # DB output
         fr2 = tk.Frame(self)
         fr2.pack(fill="x", **pad)
-        tk.Label(fr2, text="セリフCSV（任意）:", width=16, anchor="w").pack(side="left")
-        self._csv_var = tk.StringVar()
-        tk.Entry(fr2, textvariable=self._csv_var).pack(side="left", fill="x", expand=True)
-        tk.Button(fr2, text="参照", command=self._browse_csv).pack(side="left", padx=2)
-        tk.Label(fr2, text="※ export_voice_text_*.csv 形式", fg="gray").pack(side="left", padx=4)
-
-        # DB output
-        fr3 = tk.Frame(self)
-        fr3.pack(fill="x", **pad)
-        tk.Label(fr3, text="DB出力先:", width=16, anchor="w").pack(side="left")
+        tk.Label(fr2, text="DB出力先:", width=16, anchor="w").pack(side="left")
         self._db_var = tk.StringVar(
             value=str(Path.home() / "kks_voices.db"))
-        tk.Entry(fr3, textvariable=self._db_var).pack(side="left", fill="x", expand=True)
-        tk.Button(fr3, text="参照", command=self._browse_db).pack(side="left", padx=2)
+        tk.Entry(fr2, textvariable=self._db_var).pack(side="left", fill="x", expand=True)
+        tk.Button(fr2, text="参照", command=self._browse_db).pack(side="left", padx=2)
 
         # Button
         ctrl = tk.Frame(self)
@@ -377,11 +368,6 @@ class BuildDbTab(tk.Frame):
         if d:
             self._wav_var.set(d)
 
-    def _browse_csv(self):
-        d = filedialog.askdirectory(title="セリフCSVフォルダを選択")
-        if d:
-            self._csv_var.set(d)
-
     def _browse_db(self):
         p = filedialog.asksaveasfilename(
             title="DB出力先を選択",
@@ -393,7 +379,6 @@ class BuildDbTab(tk.Frame):
     def get_settings(self):
         return {
             "wav_dir": self._wav_var.get(),
-            "csv_dir": self._csv_var.get(),
             "db_path": self._db_var.get(),
         }
 
@@ -402,8 +387,6 @@ class BuildDbTab(tk.Frame):
             return
         if d.get("wav_dir"):
             self._wav_var.set(d["wav_dir"])
-        if d.get("csv_dir") is not None:
-            self._csv_var.set(d["csv_dir"])
         if d.get("db_path"):
             self._db_var.set(d["db_path"])
 
@@ -431,7 +414,6 @@ class BuildDbTab(tk.Frame):
     def _start(self):
         wav = self._wav_var.get().strip()
         db  = self._db_var.get().strip()
-        csv_dir = self._csv_var.get().strip()
         if not wav:
             messagebox.showerror("エラー", "WAVフォルダを指定してください。")
             return
@@ -442,28 +424,12 @@ class BuildDbTab(tk.Frame):
         self._build_btn.config(state=tk.DISABLED)
         self._status_var.set("構築中...")
         threading.Thread(target=self._worker,
-                         args=(wav, db, csv_dir or None),
+                         args=(wav, db),
                          daemon=True).start()
         self.after(100, self._drain)
 
-    def _worker(self, wav_dir: str, db_path: str, csv_dir):
+    def _worker(self, wav_dir: str, db_path: str):
         try:
-            # Load serif data from CSV if available
-            serif_map = {}  # filename → serif
-            if csv_dir:
-                csv_files = list(Path(csv_dir).glob("export_voice_text_*.csv"))
-                if not csv_files:
-                    self._log_queue.put(f"[serif] CSVが見つかりません（スキップ）: {csv_dir}\n")
-                for csv_path in csv_files:
-                    self._log_queue.put(f"[serif] 読み込み: {csv_path.name}\n")
-                    try:
-                        with open(csv_path, encoding="utf-8-sig") as f:
-                            for row in csv.reader(f, delimiter="|"):
-                                if len(row) >= 4:
-                                    serif_map[row[0].strip()] = row[3].strip()
-                    except Exception as e:
-                        self._log_queue.put(f"  [warn] {e}\n")
-                self._log_queue.put(f"[serif] {len(serif_map)} 件ロード\n")
 
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(db_path)
@@ -500,7 +466,7 @@ class BuildDbTab(tk.Frame):
                         parsed["file_type"],
                         "", "", "", "",     # insert_type, houshi_type, aibu_type, situation_type
                         str(wav_path),
-                        serif_map.get(fn, ""),
+                        "",  # serif は後からブラウズタブのエクスポートCSVで設定
                     ))
 
             self._log_queue.put(f"[DB] {len(voices_rows)} 件 INSERT 中...\n")
