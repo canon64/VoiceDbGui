@@ -416,7 +416,10 @@ class BuildDbTab(tk.Frame):
             # Load serif data from CSV if available
             serif_map = {}  # filename → serif
             if csv_dir:
-                for csv_path in Path(csv_dir).glob("export_voice_text_*.csv"):
+                csv_files = list(Path(csv_dir).glob("export_voice_text_*.csv"))
+                if not csv_files:
+                    self._log_queue.put(f"[serif] CSVが見つかりません（スキップ）: {csv_dir}\n")
+                for csv_path in csv_files:
                     self._log_queue.put(f"[serif] 読み込み: {csv_path.name}\n")
                     try:
                         with open(csv_path, encoding="utf-8-sig") as f:
@@ -427,6 +430,7 @@ class BuildDbTab(tk.Frame):
                         self._log_queue.put(f"  [warn] {e}\n")
                 self._log_queue.put(f"[serif] {len(serif_map)} 件ロード\n")
 
+            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(db_path)
             conn.executescript(DB_DDL)
             conn.execute("DELETE FROM voices")
