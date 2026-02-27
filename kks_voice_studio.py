@@ -70,23 +70,53 @@ LIKE_FILTERS   = ["filename","serif","wav_path"]
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _load_char_display_map(kks_dir: str) -> dict:
-    """character_map.json を読み込み {code: "c13 ギャル"} を返す。"""
-    if not kks_dir:
-        return {}
-    path = Path(kks_dir) / "voice_extract" / "character_map.json"
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text("utf-8"))
-        result = {}
-        for code, label in data.items():
-            label = label.strip()
-            parts = label.split(" ", 1)
-            name = parts[1].strip() if len(parts) > 1 else label
-            result[code] = f"{code} {name}"
-        return result
-    except Exception:
-        return {}
+    """ハードコードされたcharacter_mapを返す。"""
+    return {
+        "c00": "c00 セクシー系お姉さま",
+        "c01": "c01 お嬢様",
+        "c02": "c02 タカビー",
+        "c03": "c03 小悪魔",
+        "c04": "c04 ミステリアス",
+        "c05": "c05 電波",
+        "c06": "c06 大和撫子",
+        "c07": "c07 ボーイッシュ",
+        "c08": "c08 純真無垢",
+        "c09": "c09 アホの子",
+        "c10": "c10 邪気眼",
+        "c11": "c11 母性的",
+        "c12": "c12 姉御肌",
+        "c13": "c13 ギャル",
+        "c14": "c14 不良少女",
+        "c15": "c15 野性的",
+        "c16": "c16 意識高クール",
+        "c17": "c17 ひねくれ",
+        "c18": "c18 不幸少女",
+        "c19": "c19 文学少女",
+        "c20": "c20 モジモジ",
+        "c21": "c21 正統派ヒロイン",
+        "c22": "c22 ミーハー",
+        "c23": "c23 オタク女子",
+        "c24": "c24 ヤンデレ",
+        "c25": "c25 ダル",
+        "c26": "c26 無口",
+        "c27": "c27 意地っ張り",
+        "c28": "c28 ロリばばぁ",
+        "c29": "c29 素直クール",
+        "c30": "c30 気さく",
+        "c31": "c31 勝ち気",
+        "c32": "c32 誠実",
+        "c33": "c33 艶やか",
+        "c34": "c34 帰国子女",
+        "c35": "c35 方言娘",
+        "c36": "c36 Ｓッ気",
+        "c37": "c37 無感情",
+        "c38": "c38 几帳面",
+        "c39": "c39 島っ娘",
+        "c40": "c40 高潔",
+        "c41": "c41 ボクっ娘",
+        "c42": "c42 天真爛漫",
+        "c43": "c43 ノリノリ",
+    }
 
 def sanitize(value: str, max_len: int = 120) -> str:
     if not value:
@@ -808,15 +838,6 @@ class BrowseTab(tk.Frame):
                                        state="readonly", width=14)
         self._tbl_combo.pack(side="left", padx=4)
         self._tbl_combo.bind("<<ComboboxSelected>>", lambda e: self._on_table_changed())
-        tk.Label(mid, text="1ページ:").pack(side="left")
-        self._psize_var = tk.IntVar(value=500)
-        ttk.Spinbox(mid, textvariable=self._psize_var,
-                    from_=10, to=5000, increment=100, width=6).pack(side="left")
-        self._page_var = tk.IntVar(value=1)
-        tk.Button(mid, text="◀", command=self._prev_page).pack(side="left", padx=2)
-        tk.Label(mid, text="ページ:").pack(side="left")
-        tk.Label(mid, textvariable=self._page_var).pack(side="left")
-        tk.Button(mid, text="▶", command=self._next_page).pack(side="left", padx=2)
         self._total_var = tk.StringVar(value="0件")
         tk.Label(mid, textvariable=self._total_var).pack(side="left", padx=8)
 
@@ -947,7 +968,6 @@ class BrowseTab(tk.Frame):
             messagebox.showerror("Error", str(e))
 
     def _on_table_changed(self):
-        self._page_var.set(1)
         self._refresh_filter_state()
         self._load_distinct_values()
 
@@ -1003,7 +1023,6 @@ class BrowseTab(tk.Frame):
         return where, params
 
     def _search(self):
-        self._page_var.set(1)
         self._run_query()
         self._push_history()
         self._save_last()
@@ -1026,14 +1045,9 @@ class BrowseTab(tk.Frame):
         order = next((c for c in ["id","idx","voice_id","filename","rowid"]
                       if c in cols), "rowid")
 
-        # Paging
-        size   = max(1, self._psize_var.get())
-        page   = max(1, self._page_var.get())
-        offset = (page - 1) * size
-
+        # すべての結果を取得（ページング無し）
         cur = self.conn.execute(
-            f"SELECT * FROM {tbl} {where} ORDER BY {order} "
-            f"LIMIT {size} OFFSET {offset}", params)
+            f"SELECT * FROM {tbl} {where} ORDER BY {order}", params)
         self.current_rows    = [dict(r) for r in cur]
         self.current_visible = [c for c in VISIBLE_COLS.get(tbl, []) if c in cols]
 
@@ -1070,16 +1084,6 @@ class BrowseTab(tk.Frame):
 
     def _select_all_rows(self):
         self._tree.selection_set(self._tree.get_children())
-
-    def _prev_page(self):
-        p = self._page_var.get()
-        if p > 1:
-            self._page_var.set(p - 1)
-            self._run_query()
-
-    def _next_page(self):
-        self._page_var.set(self._page_var.get() + 1)
-        self._run_query()
 
     def _clear_filters(self):
         for v in self._combo_vars.values():
@@ -1207,7 +1211,6 @@ class BrowseTab(tk.Frame):
             "db_path":  self._db_var.get(),
             "export_dir": self._exp_var.get(),
             "table":    self._tbl_var.get(),
-            "page_size": self._psize_var.get(),
             "combo_filters": {k: v.get() for k, v in self._combo_vars.items()},
             "like_filters":  {k: v.get() for k, v in self._like_vars.items()},
         }
@@ -1221,8 +1224,6 @@ class BrowseTab(tk.Frame):
             self._exp_var.set(snap["export_dir"])
         if snap.get("table"):
             self._tbl_var.set(snap["table"])
-        if snap.get("page_size"):
-            self._psize_var.set(snap["page_size"])
         for k, v in snap.get("combo_filters", {}).items():
             if k in self._combo_vars:
                 if k == "chara" and v:
