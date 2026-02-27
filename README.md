@@ -53,18 +53,6 @@ kks_voice_studio.bat
 | DB | `{KKSフォルダ}/wave/kks_voices.db` |
 | エクスポート先 | `{KKSフォルダ}/extract_wave` |
 
-## キャラクター名マッピング
-
-`{KKSフォルダ}/voice_extract/character_map.json` に以下の形式で配置すると、
-GUI のドロップダウンやチェックボックスにキャラ名が表示されます。
-
-```json
-{
-  "c00": "00 セクシー系お姉さま",
-  "c13": "13 ギャル"
-}
-```
-
 ## ライセンス
 
 MIT

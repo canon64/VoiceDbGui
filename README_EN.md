@@ -52,17 +52,6 @@ Set the KKS root folder in the Extract tab on first launch. All other paths are 
 | Database | `{KKS folder}/wave/kks_voices.db` |
 | Export destination | `{KKS folder}/extract_wave` |
 
-## Character Name Mapping
-
-Place a `character_map.json` file at `{KKS folder}/voice_extract/character_map.json` to display character names in the UI:
-
-```json
-{
-  "c00": "00 Sexy Older Sister",
-  "c13": "13 Gyaru"
-}
-```
-
 ## License
 
 MIT
