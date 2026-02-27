@@ -833,20 +833,47 @@ class BrowseTab(tk.Frame):
         return [self.current_rows[i] for i in idxs
                 if i < len(self.current_rows)]
 
-    def _export_path(self, row: dict, tbl: str) -> str:
-        chara    = sanitize(str(row.get("chara",    "")))
-        mode     = sanitize(str(row.get("mode_name","") or
-                                f"mode_{row.get('mode','')}"))
-        level    = sanitize(str(row.get("level_name","") or
-                                f"level_{row.get('level','')}"))
-        category = sanitize(str(
-            row.get("file_type","") or
-            row.get("breath_type","") or ""))
-        filename = row.get("filename","") or "unknown.wav"
-        ext      = Path(filename).suffix or ".wav"
-        stem     = sanitize(Path(filename).stem)
-        return str(Path(tbl) / chara / mode / level / category /
-                   (stem + ext))
+    def _build_relative_export_path(self, row: dict) -> Path:
+        tbl   = self._tbl_var.get()
+        chara = sanitize(str(row.get("chara") or ""))
+        mode_name = row.get("mode_name")
+        mode_seg  = sanitize(str(mode_name)) if mode_name \
+                    else f"mode_{row.get('mode','unknown')}"
+        level_name = row.get("level_name")
+        level_seg  = sanitize(str(level_name)) if level_name \
+                     else f"level_{row.get('level','unknown')}"
+        category = (row.get("file_type") or row.get("breath_type") or
+                    row.get("houshi_type") or row.get("aibu_type") or
+                    row.get("situation_type") or "voice")
+        cat_seg  = sanitize(str(category))
+        src = str(row.get("wav_path") or "")
+        ext = Path(src).suffix if Path(src).suffix else ".wav"
+        fn  = sanitize(str(row.get("filename") or f"id_{row.get('id','unknown')}"))
+        return Path(tbl) / chara / mode_seg / level_seg / cat_seg / f"{fn}{ext}"
+
+    def _unique_dest(self, dest_root: Path, row: dict) -> Path:
+        dst = dest_root / self._build_relative_export_path(row)
+        if not dst.exists():
+            return dst
+        stem = dst.stem; suffix = dst.suffix
+        rid  = sanitize(str(row.get("id") or row.get("voice_id") or "x"))
+        for n in range(1, 1000):
+            alt = dst.with_name(f"{stem}_id{rid}_{n}{suffix}")
+            if not alt.exists():
+                return alt
+        return dst.with_name(f"{stem}_{dt.datetime.now().strftime('%H%M%S%f')}{suffix}")
+
+    def _voice_text_row(self, row: dict) -> list:
+        fn    = str(row.get("filename") or "").strip()
+        if not fn:
+            src = str(row.get("wav_path") or "")
+            fn  = Path(src).name if src else f"id_{row.get('id','unknown')}.wav"
+        if not Path(fn).suffix:
+            fn += ".wav"
+        chara = str(row.get("chara") or "").strip() or "unknown"
+        serif = str(row.get("serif") or "")
+        serif = serif.replace("\r\n", "\n").replace("\r", "\n").replace("\n", " ")
+        return [fn, chara, "JP", serif]
 
     def _export(self, all_displayed: bool):
         rows    = self._get_rows_for_export(all_displayed)
@@ -859,52 +886,58 @@ class BrowseTab(tk.Frame):
             messagebox.showerror("Error", "保存先を指定してください。")
             return
 
-        ts      = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-        manifest_path = Path(exp_dir) / f"export_manifest_{tbl}_{ts}.csv"
-        vtext_path    = Path(exp_dir) / f"export_voice_text_{tbl}_{ts}.csv"
-        seen    = set()
-        copied  = skipped = missing = failed = 0
+        dest_root = Path(exp_dir)
+        dest_root.mkdir(parents=True, exist_ok=True)
 
-        with open(manifest_path, "w", newline="", encoding="utf-8") as mf, \
-             open(vtext_path,    "w", newline="", encoding="utf-8") as vf:
-            mw = csv.writer(mf)
-            vw = csv.writer(vf, delimiter="|")
-            mw.writerow(["table","id","chara","mode_name","level_name",
-                          "filename","source_wav_path","exported_path"])
-            for row in rows:
-                serif = row.get("serif","") or ""
-                fn    = row.get("filename","")
-                chara = row.get("chara","")
-                # voice_text CSV は常に書く
-                vw.writerow([fn, chara, "JP", serif])
+        copied = missing = failed = duplicate_skipped = 0
+        manifest_rows  = []
+        voice_text_rows = []
+        seen_sources   = set()
 
-                src = row.get("wav_path","")
-                if not src or not Path(src).is_file():
-                    missing += 1
-                    continue
-                if src in seen:
-                    skipped += 1
-                    continue
-                seen.add(src)
-                rel  = self._export_path(row, tbl)
-                dest = Path(exp_dir) / rel
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                try:
-                    shutil.copy2(src, dest)
-                    copied += 1
-                    mw.writerow([tbl, row.get("id",""),
-                                  chara, row.get("mode_name",""),
-                                  row.get("level_name",""), fn,
-                                  src, str(dest)])
-                except Exception:
-                    failed += 1
+        for row in rows:
+            src = row.get("wav_path")
+            if not src:
+                missing += 1
+                continue
+            src_norm = os.path.normcase(os.path.normpath(str(src)))
+            if src_norm in seen_sources:
+                duplicate_skipped += 1
+                continue
+            if not os.path.isfile(src):
+                missing += 1
+                continue
+            dst = self._unique_dest(dest_root, row)
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copy2(src, dst)
+                copied += 1
+                seen_sources.add(src_norm)
+                manifest_rows.append({
+                    "table": tbl, "id": row.get("id"),
+                    "chara": row.get("chara"), "mode_name": row.get("mode_name"),
+                    "level_name": row.get("level_name"), "filename": row.get("filename"),
+                    "source_wav_path": src, "exported_path": str(dst),
+                })
+                voice_text_rows.append(self._voice_text_row(row))
+            except Exception:
+                failed += 1
 
-        msg = (f"完了\nコピー: {copied}\n"
-               f"スキップ（重複）: {skipped}\n"
-               f"ファイルなし: {missing}\n"
-               f"失敗: {failed}")
-        self._status_var.set(
-            f"コピー:{copied} スキップ:{skipped} なし:{missing}")
+        stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+        manifest_path = dest_root / f"export_manifest_{tbl}_{stamp}.csv"
+        with manifest_path.open("w", newline="", encoding="utf-8-sig") as f:
+            w = csv.DictWriter(f, fieldnames=[
+                "table","id","chara","mode_name","level_name",
+                "filename","source_wav_path","exported_path"])
+            w.writeheader()
+            w.writerows(manifest_rows)
+
+        vtext_path = dest_root / f"export_voice_text_{tbl}_{stamp}.csv"
+        with vtext_path.open("w", newline="", encoding="utf-8-sig") as f:
+            csv.writer(f, delimiter="|", lineterminator="\n").writerows(voice_text_rows)
+
+        msg = (f"保存完了\n対象行: {len(rows)}\n保存成功: {copied}\n"
+               f"重複スキップ: {duplicate_skipped}\nファイルなし: {missing}\n失敗: {failed}")
+        self._status_var.set(msg.replace("\n", " | "))
         messagebox.showinfo("エクスポート完了", msg)
 
     # ── History ──
