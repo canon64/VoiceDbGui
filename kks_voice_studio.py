@@ -39,12 +39,12 @@ FILENAME_RE = re.compile(
 
 TYPE_INFO = {
     "ai":   ("喘ぎ",    "aibu"),
-    "fe":   ("前戯",    "fe"),
+    "fe":   ("前戯",    "foreplay"),
     "hh":   ("奉仕",    "houshi"),
     "hh3p": ("奉仕3P",  "houshi_3p"),
-    "ka":   ("愛撫",    "aibu"),
+    "ka":   ("愛撫",    "aibu_touch"),
     "ka3p": ("愛撫3P",  "aibu_3p"),
-    "ko":   ("行為中",  "ko"),
+    "ko":   ("行為中",  "act_common"),
     "on":   ("オナニー","masturbation"),
     "so":   ("挿入",    "sonyu"),
     "so3p": ("挿入3P",  "sonyu_3p"),
@@ -75,11 +75,6 @@ def sanitize(value: str, max_len: int = 120) -> str:
         value = value.replace(c, "_")
     return value.strip()[:max_len] or "_"
 
-_INSERT_TYPES  = {"so", "so3p"}
-_HOUSHI_TYPES  = {"hh", "hh3p"}
-_AIBU_TYPES    = {"ka", "ka3p", "ai"}
-_SITUA_TYPES   = {"fe", "ko", "on"}
-
 def parse_voice_filename(filename: str):
     m = FILENAME_RE.match(filename)
     if not m:
@@ -91,18 +86,19 @@ def parse_voice_filename(filename: str):
         return None
     cn = int(char_num)
     chara = f"c{cn:02d}" if cn >= 0 else f"c{cn}"
+    ft = info[1]  # 元DBのfile_type値 ("sonyu", "act_common", "aibu_touch" 等)
     return {
         "chara":          chara,
-        "mode_name":      info[1],
+        "mode_name":      ft,
         "voice_id":       int(seq),
         "level":          int(level_code),
         "level_name":     LEVEL_NAME.get(level_code, f"level_{level_code}"),
-        "filename":       filename,
-        "file_type":      tc,
-        "insert_type":    tc if tc in _INSERT_TYPES  else "",
-        "houshi_type":    tc if tc in _HOUSHI_TYPES  else "",
-        "aibu_type":      tc if tc in _AIBU_TYPES    else "",
-        "situation_type": tc if tc in _SITUA_TYPES   else "",
+        "filename":       Path(filename).stem,  # 拡張子なし（元DBに合わせる）
+        "file_type":      ft,
+        "insert_type":    "",
+        "houshi_type":    "",
+        "aibu_type":      "",
+        "situation_type": "",
     }
 
 # ── Extract Tab ───────────────────────────────────────────────────────────────
