@@ -1,5 +1,12 @@
 __pycache__/
 *.pyc
-kks_voices_gui_state.json
+*_state.json
 *.db
 CODEBASE_STATE.md
+_probe_*/
+_probe_*.py
+_test_*.py
+_test_out/
+kks_voices_gui.py
+kks_voices_gui_state.json
+run_kks_voices_gui.bat

@@ -1,42 +1,70 @@
-# KKS Voices DB GUI
+# KKS Voice Studio
 
-`kks_voices.db` をGUIで閲覧・絞り込み・エクスポートするツール。
-
-## 対象ファイル
-- DB: `F:\kks\work\kks_voices.db`
-- スクリプト: `F:\kks\work\VoiceDbGui\kks_voices_gui.py`
-- 起動バッチ: `F:\kks\work\VoiceDbGui\run_kks_voices_gui.bat`
-
-## 起動
-1. `run_kks_voices_gui.bat` を実行
-2. もしくは PowerShell で:
-   - `python F:\kks\work\VoiceDbGui\kks_voices_gui.py`
+KKS (Koikatsu Sunshine) の音声ファイルを抽出・DB化・閲覧・エクスポートする統合ツール。
 
 ## 機能
-1. テーブル選択 (`voices`, `breaths`, `shortbreaths`, `cond_desc`)
-2. フィルタ絞り込み
-   - `chara`, `mode_name`, `level_name`, `file_type`, `insert_type`, `houshi_type`, `aibu_type`, `situation_type`, `breath_type` (一致)
-   - `filename`, `serif`, `wav_path` (部分一致)
-3. ページング表示
-   - 1ページ件数を変更可能
-4. 条件保存と履歴
-   - 前回検索条件を自動保存し、次回起動時に復元
-   - 検索ボタン押下時に履歴へ保存
-   - `履歴` ボタンから過去条件を適用/削除/全削除
-5. エクスポート
-   - `表示中を保存`: 現在表示されているページの行を保存
-   - `選択行を保存`: 表で選択した行だけ保存
-   - 同一 `wav_path` の行は重複として自動スキップ（同じ音声の重複保存を防止）
 
-## エクスポート先フォルダ構成
-保存先配下に以下規則で出力:
+### タブ1: 抽出
+- AssetBundle から WAV ファイルを抽出
+- キャラクター単位で選択可能
+- UnityPy を使用
 
-`<table>/<chara>/<mode_name or mode_x>/<level_name or level_x>/<category>/<filename>.wav`
+### タブ2: DB構築
+- 抽出済み WAV から SQLite DB を構築
+- VoicePatternData から挿入位置・奉仕種別・愛撫種別・シチュエーション種別を自動取得
+- セリフ CSV があれば字幕を付与
 
-- `category` は `file_type` などを優先して自動決定
-- 同名衝突時は `_id..._n` を付与
-- 同時に `export_manifest_<table>_<timestamp>.csv` を出力
+### タブ3: ブラウズ
+- DB を絞り込み・ページング表示
+- フィルタ: キャラ・モード・レベル・種別など
+- キャラ名を日本語表示（`voice_extract/character_map.json` 参照）
+- 表示中 or 選択行を WAV エクスポート
+  - フォルダ階層モード / フラット（1フォルダ）モード
+- voice_text CSV 同時出力（チェックボックスで切り替え）
+- エクスポート後に出力先フォルダを自動で開く
+- 検索条件を履歴として保存・復元
 
-## 注意
-1. `wav_path` が存在しない行はスキップされる
-2. `cond_desc` は音声パス列がないため、実質閲覧用途
+## 必要環境
+
+- Python 3.8+
+- [UnityPy](https://github.com/K0lb3/UnityPy) (`pip install UnityPy`) ※抽出タブのみ必要
+
+```bash
+pip install UnityPy
+```
+
+## 起動
+
+```bash
+# CMD ウィンドウなし
+kks_voice_studio.vbs
+
+# CMD あり（デバッグ用）
+kks_voice_studio.bat
+```
+
+## 設定
+
+初回起動時は「抽出」タブで KKS フォルダを指定するだけで、WAV 出力先・DB パス・エクスポート先が自動設定されます。
+
+| パス | デフォルト |
+|------|-----------|
+| WAV 出力先 | `{KKSフォルダ}/wave` |
+| DB | `{KKSフォルダ}/wave/kks_voices.db` |
+| エクスポート先 | `{KKSフォルダ}/extract_wave` |
+
+## キャラクター名マッピング
+
+`{KKSフォルダ}/voice_extract/character_map.json` に以下の形式で配置すると、
+GUI のドロップダウンやチェックボックスにキャラ名が表示されます。
+
+```json
+{
+  "c00": "00 セクシー系お姉さま",
+  "c13": "13 ギャル"
+}
+```
+
+## ライセンス
+
+MIT
